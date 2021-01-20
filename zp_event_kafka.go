@@ -33,7 +33,7 @@ func NewKafkaAsyncProducer(addrs []string, topic string) *ZPEventKafkaProducer {
 	)
 	if nil != err {
 		niuhe.LogError("[NewKafkaAsyncProducer]init kafka producer fail, %v", err)
-		return nil, fmt.Errorf("NewAsyncProducer error")
+		panic("NewKafkaAsyncProducer init kafka producer fail")
 	}
 	zpEventKafkaProducer := &ZPEventKafkaProducer{
 		Topic:         topic,
