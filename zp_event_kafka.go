@@ -9,19 +9,17 @@ import (
 	"github.com/ziipin-server/niuhe"
 )
 
-var kafkaProducer sarama.AsyncProducer = nil
-var userBehaviorTopic string
+type ZPEventKafkaProducer struct {
+	Topic         string
+	KafkaProducer sarama.AsyncProducer
+}
 
-func InitKafkaAsyncProducer(addrs []string, topic string) {
-	if kafkaProducer != nil {
-		return
-	}
+func NewKafkaAsyncProducer(addrs []string, topic string) *ZPEventKafkaProducer {
 	if len(addrs) == 0 || topic == "" {
-		niuhe.LogError("InitKafkaAsyncProducer parameters invalid")
-		panic("InitKafkaAsyncProducer parameters invalid")
+		niuhe.LogError("NewKafkaAsyncProducer parameters invalid")
+		panic("NewKafkaAsyncProducer parameters invalid")
 	}
 
-	userBehaviorTopic = topic
 	metrics.UseNilMetrics = true //禁用掉统计
 	kafkaConfig := sarama.NewConfig()
 	kafkaConfig.Producer.RequiredAcks = sarama.WaitForAll
@@ -34,29 +32,31 @@ func InitKafkaAsyncProducer(addrs []string, topic string) {
 		kafkaConfig,
 	)
 	if nil != err {
-		niuhe.LogError("[InitKafkaAsyncProducer]init kafka producer fail, %v", err)
-		panic("InitKafkaAsyncProducer NewAsyncProducer error")
+		niuhe.LogError("[NewKafkaAsyncProducer]init kafka producer fail, %v", err)
+		return nil, fmt.Errorf("NewAsyncProducer error")
 	}
-	if kafkaProducer == nil {
-		kafkaProducer = producer
+	zpEventKafkaProducer := &ZPEventKafkaProducer{
+		Topic:         topic,
+		KafkaProducer: producer,
 	}
+	return zpEventKafkaProducer
 }
 
-func PushDataToKafka(data interface{}) {
+func (self *ZPEventKafkaProducer) PushDataToKafka(data interface{}) {
 	var msg *sarama.ProducerMessage
 
 	dataByte, _ := json.Marshal(data)
 
 	msg = &sarama.ProducerMessage{
-		Topic: userBehaviorTopic,
-		Key:   sarama.StringEncoder(userBehaviorTopic),
+		Topic: self.Topic,
+		Key:   sarama.StringEncoder(self.Topic),
 		Value: sarama.ByteEncoder(dataByte),
 	}
-	kafkaProducer.Input() <- msg
+	self.KafkaProducer.Input() <- msg
 	select {
-	case _ = <-kafkaProducer.Successes():
+	case _ = <-self.KafkaProducer.Successes():
 		//niuhe.LogInfo("[PushDataToKafka] success, offset:%d, t:v", succ.Offset, succ.Timestamp)
-	case fail := <-kafkaProducer.Errors():
+	case fail := <-self.KafkaProducer.Errors():
 		niuhe.LogError("[PushDataToKafka] err:%v", fail.Err)
 	}
 }
@@ -90,7 +90,7 @@ func zpEventCheck(zpId, appId, eventName string, timestamp int64) error {
 	return nil
 }
 
-func BuildZPEvent(zpId, appId, eventName, ip, addr, appUser, zpUser string,
+func (self *ZPEventKafkaProducer) BuildZPEvent(zpId, appId, eventName, ip, addr, appUser, zpUser string,
 	timestamp int64, properties map[string]string) (*ZPEvent, error) {
 
 	if err := zpEventCheck(zpId, appId, eventName, timestamp); err != nil {
