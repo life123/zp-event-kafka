@@ -71,6 +71,8 @@ type ZPEvent struct {
 	Addr       string            `json:"addr"`       // IP对应的地址，尽可能提供，为空的话，预处理插件在数据入Hadoop之前会通过IP查一次地址，补全这个字段
 	AppUser    string            `json:"app_user"`   // 应用内账户标识，已登录用户必填
 	ZpUser     string            `json:"zp_user"`    // 通行证id，通行证登录用户必填
+	OS         string            `json:"os"`         // 客户端 操作系统 ios/android等
+	AppVer     string            `json:"app_ver"`    // 应用版本
 	Properties map[string]string `json:"properties"` // 事件属性，业务部门自行填充
 }
 
@@ -90,7 +92,7 @@ func zpEventCheck(zpId, appId, eventName string, timestamp int64) error {
 	return nil
 }
 
-func (self *ZPEventKafkaProducer) BuildZPEvent(zpId, appId, eventName, ip, addr, appUser, zpUser string,
+func (self *ZPEventKafkaProducer) BuildZPEvent(zpId, appId, eventName, ip, addr, appUser, zpUser, appVer, os string,
 	timestamp int64, properties map[string]string) (*ZPEvent, error) {
 
 	if err := zpEventCheck(zpId, appId, eventName, timestamp); err != nil {
@@ -109,6 +111,8 @@ func (self *ZPEventKafkaProducer) BuildZPEvent(zpId, appId, eventName, ip, addr,
 		Addr:       addr,
 		AppUser:    appUser,
 		ZpUser:     zpUser,
+		AppVer:     appVer,
+		OS:         os,
 		Properties: properties,
 	}
 	return e, nil
